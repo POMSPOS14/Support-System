@@ -1,0 +1,56 @@
+syntax = "proto3";
+
+package com.company.support.image;
+
+option java_multiple_files = true;
+option java_package = "com.company.support.image.grpc";
+option java_outer_classname = "ImageProto";
+
+service ImageService {
+  rpc UploadImage (UploadImageRequest) returns (ImageResponse);
+  rpc GetImagesByIncidentId (GetImagesByIncidentIdRequest) returns (ImageListResponse);
+  rpc DeleteImage (DeleteImageRequest) returns (DeleteImageResponse);
+  rpc DownloadImage (DownloadImageRequest) returns (DownloadImageResponse);
+}
+
+message DownloadImageRequest {
+  int64 id = 1;
+}
+
+message DownloadImageResponse {
+  string fileName = 1;
+  string contentType = 2;
+  bytes data = 3;
+}
+
+message UploadImageRequest {
+  int64 incidentId = 1;
+  string fileName = 2;
+  string contentType = 3;
+  bytes data = 4;
+}
+
+message GetImagesByIncidentIdRequest {
+  int64 incidentId = 1;
+}
+
+message DeleteImageRequest {
+  int64 id = 1;
+}
+
+message DeleteImageResponse {
+  bool success = 1;
+}
+
+message ImageResponse {
+  int64 id = 1;
+  int64 incidentId = 2;
+  string url = 3;
+  string fileName = 4;
+  int64 size = 5;
+  string mediaType = 6;
+}
+
+message ImageListResponse {
+  repeated ImageResponse images = 1;
+}

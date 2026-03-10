@@ -1,0 +1,39 @@
+syntax = "proto3";
+
+package com.company.support.user;
+
+option java_multiple_files = true;
+option java_package = "com.company.support.user.grpc";
+option java_outer_classname = "UserProto";
+
+service UserService {
+  rpc GetUserById (GetUserByIdRequest) returns (UserResponse);
+  rpc GetUsersByRole (GetUsersByRoleRequest) returns (UserListResponse);
+  rpc GetUserByKeycloakId (GetUserByKeycloakIdRequest) returns (UserResponse);
+}
+
+message GetUserByKeycloakIdRequest {
+  string keycloak_id = 1;
+}
+
+message GetUserByIdRequest {
+  int64 id = 1;
+}
+
+message GetUsersByRoleRequest {
+  string role = 1;
+}
+
+message UserResponse {
+  int64 id = 1;
+  string role = 2;
+  string userFullName = 3;
+  string userLogin = 4;
+  string phoneNumber = 5;
+  string email = 6;
+  string workplace = 7;
+}
+
+message UserListResponse {
+  repeated UserResponse users = 1;
+}

@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="CompilerConfiguration">
+    <annotationProcessing>
+      <profile name="Annotation profile for Support System :: Parent" enabled="true">
+        <sourceOutputDir name="target/generated-sources/annotations" />
+        <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
+        <outputRelativeToContentRoot value="true" />
+        <option name="mapstruct.defaultComponentModel" value="cdi" />
+        <processorPath useClasspath="false">
+          <entry name="$MAVEN_REPOSITORY$/org/projectlombok/lombok/1.18.32/lombok-1.18.32.jar" />
+          <entry name="$MAVEN_REPOSITORY$/org/mapstruct/mapstruct-processor/1.5.5.Final/mapstruct-processor-1.5.5.Final.jar" />
+          <entry name="$MAVEN_REPOSITORY$/org/projectlombok/lombok-mapstruct-binding/0.2.0/lombok-mapstruct-binding-0.2.0.jar" />
+        </processorPath>
+        <module name="common-proto" />
+        <module name="user-service" />
+        <module name="incident-service" />
+        <module name="image-service" />
+        <module name="notification-service" />
+      </profile>
+    </annotationProcessing>
+  </component>
+  <component name="JavacSettings">
+    <option name="ADDITIONAL_OPTIONS_OVERRIDE">
+      <module name="common-proto" options="-Amapstruct.defaultComponentModel=cdi" />
+      <module name="image-service" options="-Amapstruct.defaultComponentModel=cdi" />
+      <module name="incident-service" options="-Amapstruct.defaultComponentModel=cdi" />
+      <module name="notification-service" options="-Amapstruct.defaultComponentModel=cdi" />
+      <module name="user-service" options="-Amapstruct.defaultComponentModel=cdi" />
+    </option>
+  </component>
+</project>

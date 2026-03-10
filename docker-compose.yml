@@ -1,0 +1,117 @@
+version: '3.9'
+
+services:
+
+  # ─── Infrastructure ───────────────────────────────────────────
+
+  postgres-incident:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: incident_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports: ["5432:5432"]
+    volumes: [incident-pg-data:/var/lib/postgresql/data]
+
+  postgres-user:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: user_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports: ["5433:5432"]
+    volumes: [user-pg-data:/var/lib/postgresql/data]
+
+  postgres-image:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: image_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports: ["5434:5432"]
+    volumes: [image-pg-data:/var/lib/postgresql/data]
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:24.0
+    command: start-dev --import-realm
+    environment:
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+    ports: ["8080:8080"]
+    volumes: [./keycloak/realm-export.json:/opt/keycloak/data/import/realm-export.json]
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.6.1
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+    ports: ["2181:2181"]
+
+  kafka:
+    image: confluentinc/cp-kafka:7.6.1
+    depends_on: [zookeeper]
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    ports: ["29092:29092"]
+
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    ports: ["9000:9000", "9001:9001"]
+    volumes: [minio-data:/data]
+
+  # ─── Microservices ────────────────────────────────────────────
+
+  user-service:
+    build: ./user-service
+    ports: ["8082:8082", "9001:9001"]
+    depends_on: [postgres-user, keycloak]
+    environment:
+      DB_HOST: postgres-user
+      KEYCLOAK_URL: http://keycloak:8080
+      KEYCLOAK_REALM: support
+
+  image-service:
+    build: ./image-service
+    ports: ["8083:8083", "9002:9002"]
+    depends_on: [postgres-image, minio, keycloak, kafka]
+    environment:
+      DB_HOST: postgres-image
+      KEYCLOAK_URL: http://keycloak:8080
+      MINIO_URL: http://minio:9000
+      KAFKA_BOOTSTRAP: kafka:9092
+
+  incident-service:
+    build: ./incident-service
+    ports: ["8081:8081"]
+    depends_on: [postgres-incident, keycloak, kafka, user-service, image-service]
+    environment:
+      DB_HOST: postgres-incident
+      KEYCLOAK_URL: http://keycloak:8080
+      KAFKA_BOOTSTRAP: kafka:9092
+      USER_SERVICE_HOST: user-service
+      USER_SERVICE_GRPC_PORT: 9001
+      IMAGE_SERVICE_HOST: image-service
+      IMAGE_SERVICE_GRPC_PORT: 9002
+
+  notification-service:
+    build: ./notification-service
+    ports: ["8084:8084"]
+    depends_on: [kafka, keycloak, user-service]
+    environment:
+      KEYCLOAK_URL: http://keycloak:8080
+      KAFKA_BOOTSTRAP: kafka:9092
+      USER_SERVICE_HOST: user-service
+      USER_SERVICE_GRPC_PORT: 9001
+
+volumes:
+  incident-pg-data:
+  user-pg-data:
+  image-pg-data:
+  minio-data:
