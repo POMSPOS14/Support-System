@@ -1,0 +1,6 @@
+# Project exclude paths
+/common-proto/target/
+/image-service/target/
+/incident-service/target/
+/notification-service/target/
+/user-service/target/
