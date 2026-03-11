@@ -125,7 +125,6 @@ INCIDENT_SERVICE_OIDC_SECRET=your_secret
 |------------------|--------------------------------------|
 | incident-service | http://localhost:8081/swagger-ui     |
 | user-service     | http://localhost:8082/swagger-ui     |
-| image-service    | http://localhost:8083/swagger-ui     |
 
 ### Первый запуск: создание пользователя в системе
 
