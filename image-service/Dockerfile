@@ -11,4 +11,4 @@ ENV JAVA_OPTS="-Dquarkus.http.host=0.0.0.0 -Djava.util.logging.manager=org.jboss
 
 EXPOSE 8083
 
-CMD ["java", "-jar", "/app/quarkus-run.jar"]
+ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar /app/quarkus-run.jar"]

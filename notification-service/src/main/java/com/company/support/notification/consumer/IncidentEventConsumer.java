@@ -5,7 +5,6 @@ import com.company.support.notification.service.NotificationService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.smallrye.mutiny.Uni;
 import jakarta.enterprise.context.ApplicationScoped;
-import jakarta.inject.Inject;
 import org.eclipse.microprofile.reactive.messaging.Incoming;
 import org.jboss.logging.Logger;
 
@@ -14,11 +13,13 @@ public class IncidentEventConsumer {
 
     private static final Logger LOG = Logger.getLogger(IncidentEventConsumer.class);
 
-    @Inject
-    NotificationService notificationService;
+    private final NotificationService notificationService;
+    private final ObjectMapper objectMapper;
 
-    @Inject
-    ObjectMapper objectMapper;
+    public IncidentEventConsumer(NotificationService notificationService, ObjectMapper objectMapper) {
+        this.notificationService = notificationService;
+        this.objectMapper = objectMapper;
+    }
 
     @Incoming("incident-events")
     public Uni<Void> consume(String message) {

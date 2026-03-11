@@ -9,7 +9,6 @@ import io.quarkus.mailer.Mail;
 import io.quarkus.mailer.reactive.ReactiveMailer;
 import io.smallrye.mutiny.Uni;
 import jakarta.enterprise.context.ApplicationScoped;
-import jakarta.inject.Inject;
 import org.jboss.logging.Logger;
 
 import java.util.List;
@@ -19,45 +18,49 @@ public class NotificationService {
 
     private static final Logger LOG = Logger.getLogger(NotificationService.class);
 
-    @Inject
-    ReactiveMailer mailer;
+    private final ReactiveMailer mailer;
+    private final MutinyUserServiceGrpc.MutinyUserServiceStub userGrpcClient;
 
-    @GrpcClient("user-service")
-    MutinyUserServiceGrpc.MutinyUserServiceStub userGrpcClient;
+    public NotificationService(
+            ReactiveMailer mailer,
+            @GrpcClient("user-service") MutinyUserServiceGrpc.MutinyUserServiceStub userGrpcClient) {
+        this.mailer = mailer;
+        this.userGrpcClient = userGrpcClient;
+    }
 
     public Uni<Void> notifyAdminsAboutNewIncident(IncidentEvent event) {
         LOG.infof("Notifying admins about new incident #%d '%s'", event.getIncidentId(), event.getIncidentName());
 
         return userGrpcClient.getUsersByRole(
                         GetUsersByRoleRequest.newBuilder().setRole("ADMIN").build())
-                .flatMap(response -> {
-                    List<UserResponse> admins = response.getUsersList();
-
-                    if (admins.isEmpty()) {
-                        LOG.warn("No admins found, skipping notification");
-                        return Uni.createFrom().voidItem();
-                    }
-
-                    List<Mail> mails = admins.stream()
-                            .filter(admin -> admin.getEmail() != null && !admin.getEmail().isBlank())
-                            .map(admin -> Mail.withHtml(
-                                    admin.getEmail(),
-                                    "New incident #" + event.getIncidentId(),
-                                    buildEmailBody(event, admin)))
-                            .toList();
-
-                    if (mails.isEmpty()) {
-                        LOG.warn("Admins found but none have email, skipping notification");
-                        return Uni.createFrom().voidItem();
-                    }
-
-                    LOG.infof("Sending notification to %d admin(s)", mails.size());
-                    return mailer.send(mails.toArray(new Mail[0]));
-                })
+                .flatMap(response -> sendToAdmins(event, response.getUsersList()))
                 .onFailure().invoke(e ->
                         LOG.errorf(e, "Failed to notify admins about incident #%d", event.getIncidentId()))
                 .onFailure().recoverWithNull()
                 .replaceWithVoid();
+    }
+
+    Uni<Void> sendToAdmins(IncidentEvent event, List<UserResponse> admins) {
+        if (admins.isEmpty()) {
+            LOG.warn("No admins found, skipping notification");
+            return Uni.createFrom().voidItem();
+        }
+
+        List<Mail> mails = admins.stream()
+                .filter(admin -> admin.getEmail() != null && !admin.getEmail().isBlank())
+                .map(admin -> Mail.withHtml(
+                        admin.getEmail(),
+                        "New incident #" + event.getIncidentId(),
+                        buildEmailBody(event, admin)))
+                .toList();
+
+        if (mails.isEmpty()) {
+            LOG.warn("Admins found but none have email, skipping notification");
+            return Uni.createFrom().voidItem();
+        }
+
+        LOG.infof("Sending notification to %d admin(s)", mails.size());
+        return mailer.send(mails.toArray(new Mail[0]));
     }
 
     private String buildEmailBody(IncidentEvent event, UserResponse admin) {

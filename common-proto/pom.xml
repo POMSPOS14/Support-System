@@ -65,7 +65,7 @@
                             <id>quarkus-grpc-mutiny</id>
                             <groupId>io.quarkus</groupId>
                             <artifactId>quarkus-grpc-protoc-plugin</artifactId>
-                            <version>3.8.5</version>  <!-- используйте ту же версию, что и в вашем проекте (например, 3.8.5 или 3.15.x) -->
+                            <version>${quarkus.platform.version}</version>
                             <mainClass>io.quarkus.grpc.protoc.plugin.MutinyGrpcGenerator</mainClass>
                         </protocPlugin>
                     </protocPlugins>
@@ -75,6 +75,19 @@
                         <goals>
                             <goal>compile</goal>
                             <goal>compile-custom</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>io.smallrye</groupId>
+                <artifactId>jandex-maven-plugin</artifactId>
+                <version>3.1.2</version>
+                <executions>
+                    <execution>
+                        <id>make-index</id>
+                        <goals>
+                            <goal>jandex</goal>
                         </goals>
                     </execution>
                 </executions>

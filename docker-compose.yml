@@ -12,6 +12,11 @@ services:
       POSTGRES_PASSWORD: postgres
     ports: ["5432:5432"]
     volumes: [incident-pg-data:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d incident_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
   postgres-user:
     image: postgres:16-alpine
@@ -21,6 +26,11 @@ services:
       POSTGRES_PASSWORD: postgres
     ports: ["5433:5432"]
     volumes: [user-pg-data:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d user_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
   postgres-image:
     image: postgres:16-alpine
@@ -30,6 +40,24 @@ services:
       POSTGRES_PASSWORD: postgres
     ports: ["5434:5432"]
     volumes: [image-pg-data:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d image_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  postgres-keycloak:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: keycloak_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    volumes: [keycloak-pg-data:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d keycloak_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
   keycloak:
     image: quay.io/keycloak/keycloak:24.0
@@ -37,8 +65,21 @@ services:
     environment:
       KEYCLOAK_ADMIN: admin
       KEYCLOAK_ADMIN_PASSWORD: admin
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://postgres-keycloak:5432/keycloak_db
+      KC_DB_USERNAME: postgres
+      KC_DB_PASSWORD: postgres
     ports: ["8080:8080"]
+    depends_on:
+      postgres-keycloak:
+        condition: service_healthy
     volumes: [./keycloak/realm-export.json:/opt/keycloak/data/import/realm-export.json]
+    healthcheck:
+      test: ["CMD-SHELL", "cat /proc/net/tcp6 | awk '{print $2}' | grep -q '00000000000000000000000000001F90'"]
+      interval: 10s
+      timeout: 10s
+      retries: 15
+      start_period: 30s
 
   zookeeper:
     image: confluentinc/cp-zookeeper:7.6.1
@@ -48,7 +89,9 @@ services:
 
   kafka:
     image: confluentinc/cp-kafka:7.6.1
-    depends_on: [zookeeper]
+    depends_on:
+      zookeeper:
+        condition: service_started
     environment:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
@@ -56,6 +99,12 @@ services:
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
     ports: ["29092:29092"]
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-broker-api-versions --bootstrap-server localhost:9092 > /dev/null 2>&1"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+      start_period: 15s
 
   minio:
     image: minio/minio:latest
@@ -65,53 +114,105 @@ services:
       MINIO_ROOT_PASSWORD: minioadmin
     ports: ["9000:9000", "9001:9001"]
     volumes: [minio-data:/data]
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:9000/minio/health/live || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
   # ─── Microservices ────────────────────────────────────────────
 
   user-service:
     build: ./user-service
-    ports: ["8082:8082", "9001:9001"]
-    depends_on: [postgres-user, keycloak]
+    ports: ["8082:8082", "9007:9007"]
+    depends_on:
+      postgres-user:
+        condition: service_healthy
     environment:
       DB_HOST: postgres-user
+      DB_PORT: 5432
+      DB_NAME: user_db
+      DB_USER: postgres
+      DB_PASSWORD: postgres
       KEYCLOAK_URL: http://keycloak:8080
       KEYCLOAK_REALM: support
+      KEYCLOAK_ADMIN_CLIENT_ID: user-service
+      KEYCLOAK_ADMIN_CLIENT_SECRET: ${USER_SERVICE_OIDC_SECRET}
+      OIDC_SECRET: ${USER_SERVICE_OIDC_SECRET}
+      QUARKUS_OIDC_TOKEN_ISSUER: http://localhost:8080/realms/support
 
   image-service:
     build: ./image-service
-    ports: ["8083:8083", "9002:9002"]
-    depends_on: [postgres-image, minio, keycloak, kafka]
+    ports: ["8083:8083", "9008:9008"]
+    depends_on:
+      postgres-image:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
     environment:
       DB_HOST: postgres-image
-      KEYCLOAK_URL: http://keycloak:8080
-      MINIO_URL: http://minio:9000
+      DB_PORT: 5432
+      DB_NAME: image_db
+      DB_USER: postgres
+      DB_PASSWORD: postgres
       KAFKA_BOOTSTRAP: kafka:9092
+      MINIO_URL: http://minio:9000
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minioadmin
+      MINIO_BUCKET: incident-images
 
   incident-service:
     build: ./incident-service
     ports: ["8081:8081"]
-    depends_on: [postgres-incident, keycloak, kafka, user-service, image-service]
+    depends_on:
+      postgres-incident:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      user-service:
+        condition: service_started
+      image-service:
+        condition: service_started
     environment:
       DB_HOST: postgres-incident
+      DB_PORT: 5432
+      DB_NAME: incident_db
+      DB_USER: postgres
+      DB_PASSWORD: postgres
       KEYCLOAK_URL: http://keycloak:8080
+      KEYCLOAK_REALM: support
+      OIDC_SECRET: ${INCIDENT_SERVICE_OIDC_SECRET}
+      QUARKUS_OIDC_TOKEN_ISSUER: http://localhost:8080/realms/support
       KAFKA_BOOTSTRAP: kafka:9092
       USER_SERVICE_HOST: user-service
-      USER_SERVICE_GRPC_PORT: 9001
+      USER_SERVICE_GRPC_PORT: 9007
       IMAGE_SERVICE_HOST: image-service
-      IMAGE_SERVICE_GRPC_PORT: 9002
+      IMAGE_SERVICE_GRPC_PORT: 9008
 
   notification-service:
     build: ./notification-service
     ports: ["8084:8084"]
-    depends_on: [kafka, keycloak, user-service]
+    depends_on:
+      kafka:
+        condition: service_healthy
+      user-service:
+        condition: service_started
     environment:
-      KEYCLOAK_URL: http://keycloak:8080
       KAFKA_BOOTSTRAP: kafka:9092
       USER_SERVICE_HOST: user-service
-      USER_SERVICE_GRPC_PORT: 9001
+      USER_SERVICE_GRPC_PORT: 9007
+      MAIL_HOST: ${MAIL_HOST:-smtp.gmail.com}
+      MAIL_PORT: ${MAIL_PORT:-587}
+      MAIL_USERNAME: ${MAIL_USERNAME:-}
+      MAIL_PASSWORD: ${MAIL_PASSWORD:-}
+      MAIL_FROM: ${MAIL_FROM:-noreply@company.com}
+      MAIL_MOCK: ${MAIL_MOCK:-true}
 
 volumes:
   incident-pg-data:
   user-pg-data:
   image-pg-data:
+  keycloak-pg-data:
   minio-data:

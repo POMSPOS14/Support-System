@@ -40,6 +40,9 @@
             <version>8.5.9</version>
         </dependency>
 
+        <!-- Vert.x — для executeBlocking вокруг блокирующих MinIO вызовов -->
+        <dependency><groupId>io.quarkus</groupId><artifactId>quarkus-vertx</artifactId></dependency>
+
         <!-- Mutiny helpers for blocking MinIO calls -->
         <dependency><groupId>io.smallrye.reactive</groupId><artifactId>mutiny</artifactId></dependency>
 
@@ -49,6 +52,19 @@
         <!-- Test -->
         <dependency><groupId>io.quarkus</groupId><artifactId>quarkus-junit5</artifactId><scope>test</scope></dependency>
         <dependency><groupId>io.rest-assured</groupId><artifactId>rest-assured</artifactId><scope>test</scope></dependency>
+        <dependency><groupId>io.quarkus</groupId><artifactId>quarkus-test-security</artifactId><scope>test</scope></dependency>
+        <dependency>
+            <groupId>io.quarkus</groupId>
+            <artifactId>quarkus-junit5-mockito</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.assertj</groupId>
+            <artifactId>assertj-core</artifactId>
+            <version>3.25.3</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency><groupId>org.mockito</groupId><artifactId>mockito-core</artifactId><scope>test</scope></dependency>
     </dependencies>
 
     <build>

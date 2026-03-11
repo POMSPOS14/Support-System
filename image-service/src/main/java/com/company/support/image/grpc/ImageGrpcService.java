@@ -3,7 +3,6 @@ package com.company.support.image.grpc;
 import com.company.support.image.service.ImageService;
 import com.google.protobuf.ByteString;
 import io.quarkus.grpc.GrpcService;
-import io.smallrye.common.annotation.Blocking;
 import io.smallrye.mutiny.Uni;
 import jakarta.inject.Inject;
 
@@ -16,7 +15,6 @@ public class ImageGrpcService extends MutinyImageServiceGrpc.ImageServiceImplBas
     ImageService imageService;
 
     @Override
-    @Blocking
     public Uni<ImageResponse> uploadImage(UploadImageRequest request) {
         return imageService.upload(
                         request.getIncidentId(),
@@ -54,7 +52,6 @@ public class ImageGrpcService extends MutinyImageServiceGrpc.ImageServiceImplBas
     }
 
     @Override
-    @Blocking
     public Uni<DeleteImageResponse> deleteImage(DeleteImageRequest request) {
         return imageService.delete(request.getId())
                 .map(v -> DeleteImageResponse.newBuilder().setSuccess(true).build())
@@ -63,7 +60,6 @@ public class ImageGrpcService extends MutinyImageServiceGrpc.ImageServiceImplBas
     }
 
     @Override
-    @Blocking
     public Uni<DownloadImageResponse> downloadImage(DownloadImageRequest request) {
         return imageService.findById(request.getId())
                 .flatMap(image -> imageService.downloadFile(image.getMinioKey())
